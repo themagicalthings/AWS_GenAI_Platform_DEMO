@@ -1,7 +1,8 @@
 TF := terraform -chdir=terraform
 TFVARS := -var-file=dev.tfvars
 
-.PHONY: init fmt fmt-check validate lint plan apply ingest demo destroy test test-tf test-py
+.PHONY: onboard init fmt fmt-check validate lint plan apply ingest demo destroy test test-tf test-py
+onboard: ; bash scripts/onboard.sh
 init:    ; $(TF) init
 fmt:     ; terraform fmt -recursive
 fmt-check:; terraform fmt -check -recursive
