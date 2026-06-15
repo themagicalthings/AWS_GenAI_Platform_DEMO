@@ -10,11 +10,8 @@ variable "owner" {
   type    = string
   default = "thevamsithokala@gmail.com"
 }
-variable "agent_model_id" {
-  type    = string
-  default = "anthropic.claude-sonnet-4-5-20250929-v1:0"
-}
-variable "embedding_model_id" {
-  type    = string
-  default = "amazon.titan-embed-text-v2:0"
-}
+
+# Model-id variables (agent_model_id, embedding_model_id) are introduced in the
+# phases that consume them: embedding_model_id with the knowledge_base module
+# (plan phase 3), agent_model_id with the agent module (plan phase 5). They are
+# omitted here to keep tflint's unused-declaration check clean.
