@@ -1,0 +1,58 @@
+name: CD (manual, gated)
+
+# Deploy pipeline. Manual-dispatch ONLY — it never runs on push, so nothing is
+# applied to AWS without a human explicitly triggering it AND approving the
+# protected `production` environment.
+#
+# Prerequisites before this can run (one-time setup):
+#   1. Fill the real account id into terraform/backend.tf and bootstrap the
+#      state bucket + lock table (see docs/runbook.md / plan task 0.2).
+#   2. Create a GitHub OIDC identity provider + an IAM deploy role trusting this
+#      repo, and store its ARN as the secret AWS_DEPLOY_ROLE_ARN. (No static keys.)
+#   3. Create a GitHub Environment named "production" with required reviewers so
+#      `apply` pauses for manual approval.
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Terraform action to run"
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions:
+  id-token: write # request the OIDC token used to assume the AWS role
+  contents: read
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Terraform ${{ github.event.inputs.command }}
+    runs-on: ubuntu-latest
+    environment: production # approval gate (configure required reviewers)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Init
+        run: terraform -chdir=terraform init -input=false
+
+      - name: Plan
+        run: terraform -chdir=terraform plan -input=false -var-file=dev.tfvars -out=tfplan
+
+      - name: Apply
+        if: ${{ github.event.inputs.command == 'apply' }}
+        run: terraform -chdir=terraform apply -input=false tfplan
