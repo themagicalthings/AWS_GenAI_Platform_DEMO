@@ -1,0 +1,18 @@
+# Normalize line endings to LF in the repo so shell scripts and configs run
+# correctly on Linux CI runners regardless of the author's OS.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.tf   text eol=lf
+*.hcl  text eol=lf
+*.tftest.hcl text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.toml text eol=lf
+Makefile text eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary

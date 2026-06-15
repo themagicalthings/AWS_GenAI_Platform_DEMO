@@ -1,0 +1,22 @@
+# AWS IAM Identity Center (SSO) profile for the GenAI Knowledge Assistant.
+#
+# Setup (one time):
+#   1. cp aws/config.example ~/.aws/config      # or append these blocks
+#   2. Replace every <PLACEHOLDER> below with your org's values
+#   3. aws sso login --profile genai-ka
+#   4. make onboard
+#
+# No long-lived access keys are used or stored. CI authenticates separately via
+# GitHub OIDC (see .github/workflows/cd.yml).
+
+[profile genai-ka]
+sso_session    = genai-ka
+sso_account_id = <AWS_ACCOUNT_ID>          # e.g. 111122223333
+sso_role_name  = <PERMISSION_SET_NAME>     # e.g. AdministratorAccess
+region         = us-east-1
+output         = json
+
+[sso-session genai-ka]
+sso_start_url            = <SSO_START_URL>  # e.g. https://your-org.awsapps.com/start
+sso_region               = us-east-1
+sso_registration_scopes  = sso:account:access

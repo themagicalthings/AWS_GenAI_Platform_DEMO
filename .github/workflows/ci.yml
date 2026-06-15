@@ -1,0 +1,99 @@
+name: CI
+
+# Pull-request and push gate. Everything here runs WITHOUT AWS credentials and
+# without creating any cloud resources — Terraform is validated/linted/tested
+# offline (mock_provider), security-scanned, and the Python suite runs.
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+# Least privilege by default; individual jobs widen only if needed.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-validate:
+    name: Terraform validate + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+      - name: Format check
+        run: terraform fmt -check -recursive
+      - name: Init (no backend)
+        run: terraform -chdir=terraform init -backend=false -input=false
+      - name: Validate
+        run: terraform -chdir=terraform validate
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tflint --chdir=terraform --init
+          tflint --chdir=terraform -f compact
+
+  terraform-test:
+    name: Terraform unit tests (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+      - name: Run module + root tests (mock_provider, no AWS)
+        run: bash scripts/run_tf_tests.sh
+
+  iac-security:
+    name: IaC security scan (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          # Non-blocking during buildout so findings surface as annotations without
+          # halting iteration. Flip to false (hard-fail) before production. Track
+          # accepted findings in a .checkov.yaml skip list as they are triaged.
+          soft_fail: true
+          output_format: cli
+
+  python-quality:
+    name: Python lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # matches the Lambda runtime
+      - name: Install tooling
+        run: pip install ruff pytest
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Pytest
+        run: pytest
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --no-banner --redact
