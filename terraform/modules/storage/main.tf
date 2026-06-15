@@ -1,5 +1,7 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_s3_bucket" "docs" {
-  bucket = "${var.name}-docs"
+  bucket = "${var.name}-docs-${data.aws_caller_identity.current.account_id}"
 }
 
 resource "aws_s3_bucket_versioning" "docs" {
